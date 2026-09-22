@@ -26,7 +26,7 @@ subagent({ name: "Scout: DB", agent: "scout", task: "Map database schema" });
 ## Install
 
 ```bash
-pi install git:github.com/HazAT/pi-interactive-subagents
+pi install git:github.com/malitov/pi-interactive-subagents
 ```
 
 Supported multiplexers:
@@ -81,11 +81,12 @@ Subagent panes are created without stealing keyboard focus (cmux, tmux). Launch 
 
 | Agent             | Model                  | Role                                                                                     |
 | ----------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| **planner**       | Opus (medium thinking) | Brainstorming — clarifies requirements, explores approaches, writes plans, creates todos |
-| **scout**         | Haiku                  | Fast codebase reconnaissance — maps files, patterns, conventions                         |
-| **worker**        | Sonnet                 | Implements tasks from todos — writes code, runs tests, makes polished commits            |
-| **reviewer**      | Opus (medium thinking) | Reviews code for bugs, security issues, correctness                                      |
-| **visual-tester** | Sonnet                 | Visual QA via Chrome CDP — screenshots, responsive testing, interaction testing          |
+| **planner**       | GPT-6 Sol (medium thinking) | Brainstorming — clarifies requirements, explores approaches, writes plans, creates todos |
+| **scout**         | GPT-6 Luna             | Fast codebase reconnaissance — maps files, patterns, conventions                         |
+| **worker**        | GPT-6 Sol              | Implements tasks from todos — writes code, runs tests, makes polished commits            |
+| **reviewer**      | GPT-6 Sol (medium thinking) | Reviews code for bugs, security issues, correctness                              |
+| **visual-tester** | GPT-6 Sol              | Visual QA via Chrome CDP — screenshots, responsive testing, interaction testing          |
+| **deep-explorer** | GPT-6 Sol              | Autonomous hands-on investigation and experimentation in Pi                              |
 
 Agent discovery follows priority: **project-local** (`.pi/agents/`) > **global** (`~/.pi/agent/agents/`) > **package-bundled**. Override any bundled agent by placing your own version in the higher-priority location.
 
@@ -277,7 +278,7 @@ Place a `.md` file in `.pi/agents/` (project) or `~/.pi/agent/agents/` (global):
 ---
 name: my-agent
 description: Does something specific
-model: anthropic/claude-sonnet-4-6
+model: openai-codex/gpt-6-sol
 thinking: minimal
 tools: read, bash, edit, write
 session-mode: lineage-only
@@ -295,7 +296,7 @@ You are a specialized agent that does X...
 | ------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`        | string  | Agent name (used in `agent: "my-agent"`)                                                                                                                                                                                                                                    |
 | `description` | string  | Shown in `subagents_list` output                                                                                                                                                                                                                                            |
-| `model`       | string  | Default model (e.g. `anthropic/claude-sonnet-4-6`)                                                                                                                                                                                                                          |
+| `model`       | string  | Default model (e.g. `openai-codex/gpt-6-sol`)                                                                                                                                                                                                                          |
 | `thinking`    | string  | Thinking level: `minimal`, `medium`, `high`                                                                                                                                                                                                                                 |
 | `tools`       | string  | Comma-separated **native pi tools only**: `read`, `bash`, `edit`, `write`, `grep`, `find`, `ls`                                                                                                                                                                             |
 | `skills`      | string  | Comma-separated skill names to auto-load                                                                                                                                                                                                                                    |

@@ -1007,6 +1007,15 @@ describe("subagent discovery", () => {
     );
   });
 
+  it("bundled agents use OpenAI Codex models and the Pi CLI", () => {
+    for (const name of ["planner", "scout", "worker", "reviewer", "visual-tester", "deep-explorer"]) {
+      const defs = testApi.loadAgentDefaults(name);
+      assert.ok(defs, `expected bundled agent ${name} to be discoverable`);
+      assert.equal(defs.model, `openai-codex/gpt-6-${name === "scout" ? "luna" : "sol"}`);
+      assert.notEqual(defs.cli, "claude");
+    }
+  });
+
   it("ignores invalid session-mode values", async () => {
     await withIsolatedAgentEnv(async ({ projectAgentsDir }) => {
       writeAgentFile(
