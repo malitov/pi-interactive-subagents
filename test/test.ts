@@ -2404,4 +2404,28 @@ describe("cmux.ts", () => {
       else process.env.PI_SUBAGENT_MUX = override;
     }
   });
+
+  it("selects Orca only for an Orca-managed Pi terminal", () => {
+    const previous = [process.env.HERDR_ENV, process.env.ORCA_TERMINAL_HANDLE, process.env.ORCA_WORKTREE_ID, process.env.PI_SUBAGENT_MUX];
+    try {
+      delete process.env.HERDR_ENV;
+      delete process.env.PI_SUBAGENT_MUX;
+      process.env.ORCA_WORKTREE_ID = "repo::/tmp/project";
+      delete process.env.ORCA_TERMINAL_HANDLE;
+      assert.notEqual(getMuxBackend(), "orca");
+      process.env.ORCA_TERMINAL_HANDLE = "term_example";
+      if (process.env.PATH?.split(":").some((dir) => dir && existsSync(join(dir, "orca")))) {
+        assert.equal(getMuxBackend(), "orca");
+        process.env.HERDR_ENV = "1";
+        if (process.env.PATH?.split(":").some((dir) => dir && existsSync(join(dir, "herdr")))) {
+          assert.equal(getMuxBackend(), "herdr");
+        }
+      }
+    } finally {
+      for (const [key, value] of ["HERDR_ENV", "ORCA_TERMINAL_HANDLE", "ORCA_WORKTREE_ID", "PI_SUBAGENT_MUX"].map((key, i) => [key, previous[i]] as const)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
 });

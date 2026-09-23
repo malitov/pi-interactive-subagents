@@ -32,12 +32,13 @@ pi install git:github.com/malitov/pi-interactive-subagents
 Supported multiplexers:
 
 - [herdr](https://herdr.dev) (selected automatically when `HERDR_ENV=1`)
+- [Orca](https://www.onorca.dev/docs/cli/reference) (selected for Orca-managed terminals with `ORCA_TERMINAL_HANDLE` and `ORCA_WORKTREE_ID`)
 - [cmux](https://github.com/manaflow-ai/cmux)
 - [tmux](https://github.com/tmux/tmux)
 - [zellij](https://zellij.dev)
 - [WezTerm](https://wezfurlong.org/wezterm/) (terminal emulator with built-in multiplexing)
 
-Start pi inside herdr or one of the others:
+Start pi inside herdr, Orca, or one of the others:
 
 ```bash
 cmux pi
@@ -49,7 +50,7 @@ zellij --session pi   # then run: pi
 # just run pi inside WezTerm — no wrapper needed
 ```
 
-Optional: set `PI_SUBAGENT_MUX=herdr|cmux|tmux|zellij|wezterm` to force a specific backend. Herdr is preferred over WezTerm when both are present.
+Optional: set `PI_SUBAGENT_MUX=herdr|orca|cmux|tmux|zellij|wezterm` to force a specific backend. Auto-detection prefers herdr, then Orca, then the underlying terminal (e.g. WezTerm). Orca Dev uses `orca-dev` when `ORCA_DEV_REPO_ROOT` is set; its CLI must be built and available in PATH.
 
 If your shell startup is slow and subagent commands sometimes get dropped before the prompt is ready, set `PI_SUBAGENT_SHELL_READY_DELAY_MS` to a higher value (defaults to `500`):
 
@@ -471,6 +472,7 @@ Every sub-agent session displays a compact tools widget showing available and de
 - [pi](https://github.com/badlogic/pi-mono) — the coding agent
 - One supported multiplexer:
   - [herdr](https://herdr.dev) (`HERDR_ENV=1`)
+  - [Orca](https://www.onorca.dev/docs/cli/reference) (`ORCA_TERMINAL_HANDLE`, `ORCA_WORKTREE_ID`)
   - [cmux](https://github.com/manaflow-ai/cmux)
   - [tmux](https://github.com/tmux/tmux)
   - [zellij](https://zellij.dev)
@@ -489,7 +491,7 @@ zellij --session pi   # then run: pi
 Optional backend override:
 
 ```bash
-export PI_SUBAGENT_MUX=herdr   # or cmux, tmux, zellij, wezterm
+export PI_SUBAGENT_MUX=herdr   # or orca, cmux, tmux, zellij, wezterm
 ```
 
 ---

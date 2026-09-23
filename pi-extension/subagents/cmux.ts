@@ -6,7 +6,7 @@ import { basename, dirname, join } from "node:path";
 
 const execFileAsync = promisify(execFile);
 
-export type MuxBackend = "cmux" | "tmux" | "zellij" | "wezterm" | "herdr";
+export type MuxBackend = "cmux" | "tmux" | "zellij" | "wezterm" | "herdr" | "orca";
 
 const commandAvailability = new Map<string, boolean>();
 
@@ -43,7 +43,7 @@ function hasCommand(command: string): boolean {
 
 function muxPreference(): MuxBackend | null {
   const pref = (process.env.PI_SUBAGENT_MUX ?? "").trim().toLowerCase();
-  if (pref === "cmux" || pref === "tmux" || pref === "zellij" || pref === "wezterm" || pref === "herdr") return pref;
+  if (pref === "cmux" || pref === "tmux" || pref === "zellij" || pref === "wezterm" || pref === "herdr" || pref === "orca") return pref;
   return null;
 }
 
@@ -65,6 +65,22 @@ function isWezTermRuntimeAvailable(): boolean {
 
 function isHerdrRuntimeAvailable(): boolean {
   return process.env.HERDR_ENV === "1" && hasCommand("herdr");
+}
+
+function orcaCommand(): string {
+  return process.env.ORCA_CLI_COMMAND || (process.env.ORCA_DEV_REPO_ROOT ? "orca-dev" : "orca");
+}
+
+function isOrcaRuntimeAvailable(): boolean {
+  if (!process.env.ORCA_TERMINAL_HANDLE || !process.env.ORCA_WORKTREE_ID) return false;
+  const cli = orcaCommand();
+  return cli.includes("/") ? existsSync(cli) : /^[\w-]+$/.test(cli) && hasCommand(cli);
+}
+
+function orcaJson(args: string[]): any {
+  const output = JSON.parse(execFileSync(orcaCommand(), [...args, "--json"], { encoding: "utf8" }));
+  if (!output.ok) throw new Error(`Orca ${args.join(" ")} failed: ${output.error?.message ?? "unknown error"}`);
+  return output.result;
 }
 
 export function isCmuxAvailable(): boolean {
@@ -90,8 +106,10 @@ export function getMuxBackend(): MuxBackend | null {
   if (pref === "zellij") return isZellijRuntimeAvailable() ? "zellij" : null;
   if (pref === "wezterm") return isWezTermRuntimeAvailable() ? "wezterm" : null;
   if (pref === "herdr") return isHerdrRuntimeAvailable() ? "herdr" : null;
+  if (pref === "orca") return isOrcaRuntimeAvailable() ? "orca" : null;
 
   if (isHerdrRuntimeAvailable()) return "herdr";
+  if (isOrcaRuntimeAvailable()) return "orca";
   if (isCmuxRuntimeAvailable()) return "cmux";
   if (isTmuxRuntimeAvailable()) return "tmux";
   if (isZellijRuntimeAvailable()) return "zellij";
@@ -118,7 +136,8 @@ export function muxSetupHint(): string {
     return "Start pi inside WezTerm.";
   }
   if (pref === "herdr") return "Start pi inside herdr (HERDR_ENV=1).";
-  return "Start pi inside herdr, cmux (`cmux pi`), tmux (`tmux new -A -s pi 'pi'`), zellij (`zellij --session pi`, then run `pi`), or WezTerm.";
+  if (pref === "orca") return "Start pi inside an Orca-managed terminal (ORCA_TERMINAL_HANDLE and ORCA_WORKTREE_ID required).";
+  return "Start pi inside herdr, Orca, cmux (`cmux pi`), tmux (`tmux new -A -s pi 'pi'`), zellij (`zellij --session pi`, then run `pi`), or WezTerm.";
 }
 
 function requireMuxBackend(): MuxBackend {
@@ -783,6 +802,12 @@ export function createSurface(name: string): string {
     return createZellijSurface(name);
   }
 
+  if (backend === "orca") {
+    const handle = orcaJson(["terminal", "create", "--worktree", `id:${process.env.ORCA_WORKTREE_ID}`, "--title", name]).terminal?.handle;
+    if (typeof handle !== "string" || !handle) throw new Error("Orca terminal create did not return a handle");
+    return handle;
+  }
+
   // On tmux, target the parent pi's pane so splits follow the agent, not the user's focus.
   // See https://github.com/HazAT/pi-interactive-subagents/issues/12
   const fromSurface = backend === "tmux" ? process.env.TMUX_PANE : backend === "herdr" ? process.env.HERDR_PANE_ID : undefined;
@@ -837,6 +862,14 @@ export function createSurfaceSplit(
     const pane = JSON.parse(raw).result?.pane?.pane_id;
     if (typeof pane !== "string" || !pane) throw new Error(`Unexpected herdr pane split output: ${raw}`);
     return pane;
+  }
+
+  if (backend === "orca") {
+    const parent = fromSurface ?? process.env.ORCA_TERMINAL_HANDLE;
+    if (!parent) throw new Error("ORCA_TERMINAL_HANDLE not set");
+    const handle = orcaJson(["terminal", "split", "--terminal", parent, "--direction", direction === "up" || direction === "down" ? "vertical" : "horizontal"]).terminal?.handle;
+    if (typeof handle !== "string" || !handle) throw new Error("Orca terminal split did not return a handle");
+    return handle;
   }
 
   if (backend === "tmux") {
@@ -926,6 +959,11 @@ export function createSurfaceSplit(
 export function renameCurrentTab(title: string): void {
   const backend = requireMuxBackend();
 
+  if (backend === "orca") {
+    orcaJson(["terminal", "rename", "--terminal", process.env.ORCA_TERMINAL_HANDLE!, "--title", title]);
+    return;
+  }
+
   if (backend === "herdr") {
     if (process.env.HERDR_TAB_ID) execFileSync("herdr", ["tab", "rename", process.env.HERDR_TAB_ID, title]);
     return;
@@ -978,6 +1016,8 @@ export function renameCurrentTab(title: string): void {
  */
 export function renameWorkspace(title: string): void {
   const backend = requireMuxBackend();
+
+  if (backend === "orca") return; // Orca worktree names are user-owned; don't rename them for /plan.
 
   if (backend === "herdr") {
     if (process.env.HERDR_WORKSPACE_ID) execFileSync("herdr", ["workspace", "rename", process.env.HERDR_WORKSPACE_ID, title]);
@@ -1037,6 +1077,11 @@ export function renameWorkspace(title: string): void {
 export function sendCommand(surface: string, command: string): void {
   const backend = requireMuxBackend();
 
+  if (backend === "orca") {
+    orcaJson(["terminal", "send", "--terminal", surface, "--text", `cd ${shellEscape(process.cwd())} && ${command}`, "--enter"]);
+    return;
+  }
+
   if (backend === "herdr") {
     execFileSync("herdr", ["pane", "run", surface, command]);
     return;
@@ -1073,6 +1118,11 @@ export function sendCommand(surface: string, command: string): void {
  */
 export function sendEscape(surface: string): void {
   const backend = requireMuxBackend();
+
+  if (backend === "orca") {
+    orcaJson(["terminal", "send", "--terminal", surface, "--interrupt"]);
+    return;
+  }
 
   if (backend === "herdr") {
     execFileSync("herdr", ["pane", "send-keys", surface, "Escape"]);
@@ -1143,6 +1193,10 @@ export function sendLongCommand(
 export function readScreen(surface: string, lines = 50): string {
   const backend = requireMuxBackend();
 
+  if (backend === "orca") {
+    return (orcaJson(["terminal", "read", "--terminal", surface, "--screen"]).terminal?.tail ?? []).slice(-lines).join("\n");
+  }
+
   if (backend === "herdr") {
     return execFileSync("herdr", ["pane", "read", surface, "--source", "recent-unwrapped", "--lines", String(lines)], { encoding: "utf8" });
   }
@@ -1189,6 +1243,13 @@ export function readScreen(surface: string, lines = 50): string {
  */
 export async function readScreenAsync(surface: string, lines = 50): Promise<string> {
   const backend = requireMuxBackend();
+
+  if (backend === "orca") {
+    const { stdout } = await execFileAsync(orcaCommand(), ["terminal", "read", "--terminal", surface, "--screen", "--json"], { encoding: "utf8" });
+    const response = JSON.parse(stdout);
+    if (!response.ok) throw new Error(`Orca terminal read failed: ${response.error?.message ?? "unknown error"}`);
+    return (response.result.terminal?.tail ?? []).slice(-lines).join("\n");
+  }
 
   if (backend === "herdr") {
     const { stdout } = await execFileAsync("herdr", ["pane", "read", surface, "--source", "recent-unwrapped", "--lines", String(lines)], { encoding: "utf8" });
@@ -1237,6 +1298,11 @@ export async function readScreenAsync(surface: string, lines = 50): Promise<stri
  */
 export function closeSurface(surface: string): void {
   const backend = requireMuxBackend();
+
+  if (backend === "orca") {
+    orcaJson(["terminal", "close", "--terminal", surface]);
+    return;
+  }
 
   if (backend === "herdr") {
     execFileSync("herdr", ["pane", "close", surface]);
