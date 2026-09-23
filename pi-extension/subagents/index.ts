@@ -115,6 +115,12 @@ const SubagentParams = Type.Object({
         "Force the full-context fork mode for this spawn. The sub-agent inherits the current session conversation, overriding any agent frontmatter session-mode.",
     }),
   ),
+  autoExit: Type.Optional(
+    Type.Boolean({
+      description:
+        "Automatically finish the Pi subagent session and return its result after its final response, without requiring subagent_done. Set true for autonomous tasks, especially when no agent profile is supplied. Overrides the agent's auto-exit setting; defaults to that setting or false. Leave false for user-driven planning or iteration.",
+    }),
+  ),
   interactive: Type.Optional(
     Type.Boolean({
       description:
@@ -331,13 +337,20 @@ function resolveLaunchBehavior(
   };
 }
 
+function resolveEffectiveAutoExit(
+  params: Static<typeof SubagentParams>,
+  agentDefs: AgentDefaults | null,
+): boolean {
+  return params.autoExit ?? agentDefs?.autoExit ?? false;
+}
+
 /**
  * Decide whether a subagent is interactive (user-driven, long-running).
  *
  * Resolution order:
  *   1. Explicit `interactive` tool parameter wins.
  *   2. Explicit `interactive` frontmatter field on the agent.
- *   3. Default: the inverse of `auto-exit`. Agents that auto-exit are
+ *   3. Default: the inverse of the effective `autoExit`. Agents that auto-exit are
  *      autonomous (scout, worker, reviewer) and the parent session should be
  *      woken on stall/recovery transitions. Agents that don't auto-exit are
  *      driven by the user in their own pane (planner, iterate/fork) and
@@ -353,7 +366,7 @@ function resolveEffectiveInteractive(
 ): boolean {
   if (params.interactive != null) return params.interactive;
   if (agentDefs?.interactive != null) return agentDefs.interactive;
-  return !(agentDefs?.autoExit ?? false);
+  return !resolveEffectiveAutoExit(params, agentDefs);
 }
 
 function loadAgentDefaults(agentName: string): AgentDefaults | null {
@@ -900,6 +913,7 @@ export const __test__ = {
   discoverAgentDefinitions,
   resolveEffectiveSessionMode,
   resolveLaunchBehavior,
+  resolveEffectiveAutoExit,
   resolveEffectiveInteractive,
   buildSubagentToolAllowlist,
   buildPiPromptArgs,
@@ -943,6 +957,7 @@ async function launchSubagent(
   const effectiveTools = params.tools ?? agentDefs?.tools;
   const effectiveSkills = params.skills ?? agentDefs?.skills;
   const effectiveThinking = agentDefs?.thinking;
+  const effectiveAutoExit = resolveEffectiveAutoExit(params, agentDefs);
   const effectiveInteractive = resolveEffectiveInteractive(params, agentDefs);
 
   const sessionFile = ctx.sessionManager.getSessionFile();
@@ -992,12 +1007,12 @@ async function launchSubagent(
   // Build the task message
   // Only full-context fork mode inherits prior conversation state.
   // Blank-session modes need the wrapper instructions and artifact-backed handoff.
-  const modeHint = agentDefs?.autoExit
+  const modeHint = effectiveAutoExit
     ? "Complete your task autonomously."
     : "Complete your task. When finished, call the subagent_done tool. The user can interact with you at any time.";
-  const summaryInstruction = agentDefs?.autoExit
-    ? "Your FINAL assistant message should summarize what you accomplished."
-    : "Your FINAL assistant message (before calling subagent_done or before the user exits) should summarize what you accomplished.";
+  const summaryInstruction = effectiveAutoExit
+    ? "Your FINAL assistant message is returned to the orchestrator automatically. Include the actual findings or changes, verification results, and any blockers or unverified assumptions. Do not only say 'done' or refer to an earlier answer. Do not wait for the user to ask you to return the result."
+    : "When the task is complete, send an assistant message with the actual findings or changes, verification results, and any blockers or unverified assumptions. Then call subagent_done to return control to the orchestrator; a final message alone does not return the result. Do not wait for a reminder. While user input is still needed, continue the conversation instead of calling subagent_done.";
   const denySet = resolveDenyTools(agentDefs);
   const identity = agentDefs?.body ?? params.systemPrompt ?? null;
   const systemPromptMode = agentDefs?.systemPromptMode;
@@ -1134,9 +1149,8 @@ async function launchSubagent(
   if (params.agent) {
     envParts.push(`PI_SUBAGENT_AGENT=${shellEscape(params.agent)}`);
   }
-  if (agentDefs?.autoExit) {
-    envParts.push(`PI_SUBAGENT_AUTO_EXIT=1`);
-  }
+  // Explicitly clear an inherited value when an autonomous parent launches an interactive child.
+  envParts.push(`PI_SUBAGENT_AUTO_EXIT=${effectiveAutoExit ? "1" : "0"}`);
   envParts.push(`PI_SUBAGENT_SESSION=${shellEscape(subagentSessionFile)}`);
   envParts.push(`PI_SUBAGENT_ID=${shellEscape(id)}`);
   envParts.push(`PI_SUBAGENT_ACTIVITY_FILE=${shellEscape(activityFile)}`);

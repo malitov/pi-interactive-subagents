@@ -952,6 +952,23 @@ describe("subagent discovery", () => {
     );
   });
 
+  it("autoExit explicitly enables completion for a standalone researcher and controls default tracking", () => {
+    const params = { name: "Researcher", task: "Return findings", autoExit: true };
+    assert.equal(testApi.resolveEffectiveAutoExit(params, null), true);
+    assert.equal(testApi.resolveEffectiveInteractive(params, null), false);
+    assert.equal(testApi.resolveEffectiveAutoExit({ ...params, autoExit: false }, { autoExit: true }), false);
+    assert.equal(testApi.resolveEffectiveInteractive({ ...params, autoExit: false }, { autoExit: true }), true);
+    assert.equal(testApi.resolveEffectiveInteractive({ ...params, interactive: true }, null), true);
+  });
+
+  it("preserves manual completion for planner and iterate unless autoExit is explicitly enabled", () => {
+    const params = { name: "Planner", task: "Plan", fork: true };
+    assert.equal(testApi.resolveEffectiveAutoExit(params, null), false);
+    assert.equal(testApi.resolveEffectiveAutoExit(params, {}), false);
+    assert.equal(testApi.resolveEffectiveAutoExit(params, { autoExit: true }), true);
+    assert.equal(testApi.resolveEffectiveAutoExit({ ...params, interactive: false }, null), false);
+  });
+
   it("resolveEffectiveInteractive honors explicit frontmatter over the auto-exit default", () => {
     // Autonomous agent that still wants to be treated as interactive.
     assert.equal(

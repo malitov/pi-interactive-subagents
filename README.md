@@ -174,6 +174,7 @@ subagent({ name: "Designer", agent: "game-designer", cwd: "agents/game-designer"
 | `task`                 | string  | required       | Task prompt for the sub-agent                                                                     |
 | `agent`                | string  | —              | Load defaults from agent definition                                                               |
 | `fork`                 | boolean | `false`        | Force the full-context fork mode for this spawn, overriding any agent `session-mode` frontmatter  |
+| `autoExit`             | boolean | agent setting or `false` | Automatically finish a Pi-backed session after its final response. Overrides agent `auto-exit`; use `true` for autonomous tasks without a profile. |
 | `interactive`          | boolean | derived        | Mark this spawn as interactive (don't wake the parent on stall/recovery). Defaults to the agent's `interactive` frontmatter, otherwise the inverse of `auto-exit`. |
 | `model`                | string  | —              | Override agent's default model                                                                    |
 | `systemPrompt`         | string  | —              | Append to system prompt                                                                           |
@@ -334,6 +335,14 @@ session-mode: lineage-only
 ```
 
 ### `auto-exit`
+
+For an autonomous task without a named profile, request completion explicitly:
+
+```typescript
+subagent({ name: "Researcher", task: "Research the question and return findings", autoExit: true });
+```
+
+`autoExit` overrides the profile's `auto-exit`. Setting `interactive: false` alone does not enable auto-exit; it only controls status notifications. Planner and `/iterate` retain manual completion unless auto-exit is explicitly requested.
 
 When set to `true`, the agent session shuts down automatically as soon as the agent finishes its turn — no explicit `subagent_done` call is needed.
 
