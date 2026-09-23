@@ -1,6 +1,6 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -21,6 +21,7 @@ import {
   shellEscape,
   isCmuxAvailable,
   isWezTermAvailable,
+  getMuxBackend,
   parseCmuxFocusedSnapshot,
   parseCmuxFocusedSnapshotFromJson,
   parseCmuxJson,
@@ -2383,5 +2384,24 @@ describe("cmux.ts", () => {
       const result = isWezTermAvailable();
       assert.equal(typeof result, "boolean");
     });
+  });
+
+  it("selects herdr only when HERDR_ENV=1, ahead of the underlying WezTerm", () => {
+    const previous = process.env.HERDR_ENV;
+    const override = process.env.PI_SUBAGENT_MUX;
+    try {
+      delete process.env.PI_SUBAGENT_MUX;
+      process.env.HERDR_ENV = "true";
+      assert.notEqual(getMuxBackend(), "herdr");
+      process.env.HERDR_ENV = "1";
+      if (process.env.PATH?.split(":").some((dir) => dir && existsSync(join(dir, "herdr")))) {
+        assert.equal(getMuxBackend(), "herdr");
+      }
+    } finally {
+      if (previous === undefined) delete process.env.HERDR_ENV;
+      else process.env.HERDR_ENV = previous;
+      if (override === undefined) delete process.env.PI_SUBAGENT_MUX;
+      else process.env.PI_SUBAGENT_MUX = override;
+    }
   });
 });

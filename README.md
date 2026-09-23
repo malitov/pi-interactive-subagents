@@ -31,12 +31,13 @@ pi install git:github.com/malitov/pi-interactive-subagents
 
 Supported multiplexers:
 
+- [herdr](https://herdr.dev) (selected automatically when `HERDR_ENV=1`)
 - [cmux](https://github.com/manaflow-ai/cmux)
 - [tmux](https://github.com/tmux/tmux)
 - [zellij](https://zellij.dev)
 - [WezTerm](https://wezfurlong.org/wezterm/) (terminal emulator with built-in multiplexing)
 
-Start pi inside one of them:
+Start pi inside herdr or one of the others:
 
 ```bash
 cmux pi
@@ -48,7 +49,7 @@ zellij --session pi   # then run: pi
 # just run pi inside WezTerm — no wrapper needed
 ```
 
-Optional: set `PI_SUBAGENT_MUX=cmux|tmux|zellij|wezterm` to force a specific backend.
+Optional: set `PI_SUBAGENT_MUX=herdr|cmux|tmux|zellij|wezterm` to force a specific backend. Herdr is preferred over WezTerm when both are present.
 
 If your shell startup is slow and subagent commands sometimes get dropped before the prompt is ready, set `PI_SUBAGENT_SHELL_READY_DELAY_MS` to a higher value (defaults to `500`):
 
@@ -56,7 +57,7 @@ If your shell startup is slow and subagent commands sometimes get dropped before
 export PI_SUBAGENT_SHELL_READY_DELAY_MS=2500
 ```
 
-Subagent panes are created without stealing keyboard focus (cmux, tmux). Launch commands target child surfaces by explicit ID, so focus and command delivery are independent. Note: the `interactive` option controls parent status notifications, not terminal focus.
+Subagent panes are created without stealing keyboard focus (herdr, cmux, tmux). Launch commands target child surfaces by explicit ID, so focus and command delivery are independent. Note: the `interactive` option controls parent status notifications, not terminal focus.
 
 ## What's Included
 
@@ -469,6 +470,7 @@ Every sub-agent session displays a compact tools widget showing available and de
 
 - [pi](https://github.com/badlogic/pi-mono) — the coding agent
 - One supported multiplexer:
+  - [herdr](https://herdr.dev) (`HERDR_ENV=1`)
   - [cmux](https://github.com/manaflow-ai/cmux)
   - [tmux](https://github.com/tmux/tmux)
   - [zellij](https://zellij.dev)
@@ -487,7 +489,7 @@ zellij --session pi   # then run: pi
 Optional backend override:
 
 ```bash
-export PI_SUBAGENT_MUX=cmux   # or tmux, zellij, wezterm
+export PI_SUBAGENT_MUX=herdr   # or cmux, tmux, zellij, wezterm
 ```
 
 ---
