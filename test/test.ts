@@ -1048,6 +1048,12 @@ describe("subagent discovery", () => {
     assert.doesNotMatch(plan, /Save your findings to:/);
   });
 
+  it("worker does not require todo tooling or commits", () => {
+    const worker = readFileSync(new URL("../agents/worker.md", import.meta.url), "utf8");
+    assert.match(worker, /Commit only when the task explicitly requests a commit/);
+    assert.doesNotMatch(worker, /todo\(|\/skill:commit|claim the todo|close the todo/i);
+  });
+
   it("ignores invalid session-mode values", async () => {
     await withIsolatedAgentEnv(async ({ projectAgentsDir }) => {
       writeAgentFile(

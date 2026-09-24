@@ -148,22 +148,22 @@ Review with the user:
 Spawn workers sequentially. Each worker gets the plan path and scout context:
 
 ```typescript
-// Workers execute todos sequentially — one at a time
+// Workers execute scoped tasks sequentially — one at a time
 subagent({
   name: "🔨 Worker 1/N",
   agent: "worker",
-  task: "Implement TODO-xxxx. Mark the todo as done. Plan: [plan path]\n\nScout context: [paste scout summary from Phase 2, plus any re-scout from Phase 3]",
+  task: "Implement [task details and acceptance criteria]. Plan: [plan path]\n\nScout context: [paste scout summary from Phase 2, plus any re-scout from Phase 3]",
 });
 
-// Check result, then next todo
+// Check the result, update orchestration state, then start the next task
 subagent({
   name: "🔨 Worker 2/N",
   agent: "worker",
-  task: "Implement TODO-yyyy. Mark the todo as done. Plan: [plan path]\n\nScout context: [paste scout summary]",
+  task: "Implement [next task details and acceptance criteria]. Plan: [plan path]\n\nScout context: [paste scout summary]",
 });
 ```
 
-**Always run workers sequentially in the same git repo** — parallel workers will conflict on commits.
+**Always run workers sequentially in the same git repo** — parallel workers can conflict in the shared working tree.
 
 ---
 
@@ -199,7 +199,7 @@ Before reporting done:
 
 1. ✅ Scout ran before the planner?
 2. ✅ Scout context was passed to the planner?
-3. ✅ All worker todos closed?
-4. ✅ Every todo has a polished commit (using the `commit` skill)?
+3. ✅ All worker tasks completed and verified?
+4. ✅ Any explicitly requested commits created?
 5. ✅ Reviewer has run?
 6. ✅ Reviewer findings triaged and addressed?
