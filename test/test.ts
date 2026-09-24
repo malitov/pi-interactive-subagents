@@ -1035,6 +1035,19 @@ describe("subagent discovery", () => {
     }
   });
 
+  it("scout and reviewer return reports without requiring a write tool", () => {
+    for (const name of ["scout", "reviewer"]) {
+      const content = readFileSync(new URL(`../agents/${name}.md`, import.meta.url), "utf8");
+      assert.match(content, /^tools: read, bash$/m);
+      assert.match(content, /Return the complete report in your final assistant message/);
+      assert.match(content, /The orchestrator saves it to a file if needed/);
+      assert.doesNotMatch(content, /^output:|Use the `write` tool to save/m);
+    }
+    const plan = readFileSync(new URL("../pi-extension/subagents/plan-skill.md", import.meta.url), "utf8");
+    assert.match(plan, /As the orchestrator, save the returned report/);
+    assert.doesNotMatch(plan, /Save your findings to:/);
+  });
+
   it("ignores invalid session-mode values", async () => {
     await withIsolatedAgentEnv(async ({ projectAgentsDir }) => {
       writeAgentFile(

@@ -52,7 +52,7 @@ Spend ~30 seconds. Tech stack, project shape, and the area relevant to the user'
 
 ## Artifact Paths
 
-For a planning run, pick a short `<name>` (e.g. `auth-redesign`) and use a shared directory under `.pi/plans/YYYY-MM-DD-<name>/` for every deliverable. Pass explicit paths in each subagent's task and read them back with the plain `read` tool when a subagent finishes.
+For a planning run, pick a short `<name>` (e.g. `auth-redesign`) and use a shared directory under `.pi/plans/YYYY-MM-DD-<name>/` for every deliverable. Scout and reviewer return reports in their final messages; the orchestrator writes those reports to the paths below when needed. Only ask agents with a suitable write tool and role permissions, such as planner, to create their own artifacts.
 
 Standard filenames:
 
@@ -72,11 +72,11 @@ subagent({
   agent: "scout",
   task: `Analyze the codebase for [user's request area]. Map file structure, key modules, patterns, conventions, and existing code related to [feature area]. Focus on what a planner would need to understand before designing this feature.
 
-Save your findings to: .pi/plans/YYYY-MM-DD-<name>/scout-context.md`,
+Return your complete findings in your final message. Do not create a report file.`,
 });
 ```
 
-**Wait for the scout to finish.** Read the scout's context file with the `read` tool — you'll pass it to the planner.
+**Wait for the scout's automatic result delivery.** As the orchestrator, save the returned report to `.pi/plans/YYYY-MM-DD-<name>/scout-context.md` using your own `write` tool, then pass the findings to the planner. If writing is unavailable, pass the report inline and do not claim a file exists.
 
 The planner can spawn **additional** scouts or researchers mid-session if it hits a factual gap. That's expected — don't try to pre-scout every possible area.
 
@@ -176,9 +176,11 @@ subagent({
   name: "Reviewer",
   agent: "reviewer",
   interactive: false,
-  task: "Review the recent changes. Plan: [plan path]",
+  task: "Review the recent changes. Plan: [plan path]. Return the complete review in your final message; do not create a report file.",
 });
 ```
+
+After the reviewer returns, the orchestrator may save its report to `.pi/plans/YYYY-MM-DD-<name>/review.md` using its own `write` tool. Otherwise keep it inline; do not ask the reviewer to write it.
 
 Triage findings:
 
