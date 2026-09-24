@@ -1054,6 +1054,14 @@ describe("subagent discovery", () => {
     assert.doesNotMatch(worker, /todo\(|\/skill:commit|claim the todo|close the todo/i);
   });
 
+  it("planner defaults to proportional planning without unsupported dependencies", () => {
+    const planner = readFileSync(new URL("../agents/planner.md", import.meta.url), "utf8");
+    assert.match(planner, /Short path — default/);
+    assert.match(planner, /Deep path — only when justified/);
+    assert.match(planner, /Do not force confirmation/);
+    assert.doesNotMatch(planner, /researcher|write-todos|\/answer|todo\(/i);
+  });
+
   it("ignores invalid session-mode values", async () => {
     await withIsolatedAgentEnv(async ({ projectAgentsDir }) => {
       writeAgentFile(

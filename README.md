@@ -83,7 +83,7 @@ Subagent panes are created without stealing keyboard focus (herdr, cmux, tmux). 
 
 | Agent             | Model                  | Role                                                                                     |
 | ----------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| **planner**       | GPT-6 Sol (medium thinking) | Brainstorming — clarifies requirements, explores approaches, writes plans, creates todos |
+| **planner**       | GPT-6 Sol (medium thinking) | Produces proportional plans — concise by default, deeper for ambiguous or risky work     |
 | **scout**         | GPT-6 Luna             | Fast codebase reconnaissance — maps files, patterns, conventions                         |
 | **worker**        | GPT-5.6 Luna (max thinking) | Implements scoped changes and runs targeted verification                                |
 | **reviewer**      | GPT-6 Sol (medium thinking) | Reviews code for bugs, security issues, correctness                              |
@@ -245,11 +245,11 @@ The `/plan` command orchestrates a full planning-to-implementation pipeline.
 ```
 
 ```
-Phase 1: Investigation    → Quick codebase scan
-Phase 2: Planning         → Interactive planner subagent (user collaborates)
-Phase 3: Review Plan      → Confirm todos, adjust if needed
-Phase 4: Execute          → Scout + sequential workers implement todos
-Phase 5: Review           → Reviewer subagent checks all changes
+Phase 1: Context          → Inspect or run a bounded scout when needed
+Phase 2: Planning         → Interactive planner; short path by default
+Phase 3: Review Plan      → Confirm material choices when needed
+Phase 4: Execute          → Sequential workers implement scoped steps
+Phase 5: Review           → Reviewer checks all changes
 ```
 
 Tab/window titles update to show current phase:

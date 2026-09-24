@@ -1,205 +1,105 @@
 ---
 name: plan
 description: >
-  Planning workflow. Runs a pre-flight scout, then spawns the planner agent
-  which clarifies WHAT to build and figures out HOW, with the ability to
-  spawn its own scouts/researchers mid-session. Use when asked to "plan",
-  "brainstorm", "I want to build X", or "let's design". Requires the
-  subagents extension and a supported multiplexer (cmux/tmux/zellij).
+  Planning workflow. Gathers only the codebase context needed, then uses the
+  interactive planner to produce a proportional implementation plan. Use when
+  asked to plan, brainstorm, or design a change. Requires the subagents
+  extension and a supported multiplexer.
 ---
 
 # Plan
 
-A planning workflow. A scout maps the relevant codebase, then an interactive planner clarifies intent + requirements and designs the technical approach, producing a `plan.md` and todos.
+Produce a plan proportional to the task. Simple changes get a short plan; ambiguous, cross-cutting, or risky changes get deeper discussion.
 
-**Announce at start:** "Let me take a quick look, then I'll send a scout to map the codebase before we start the planning session."
+## Flow
 
----
+1. Assess the request and inspect enough of the repository to focus discovery.
+2. Spawn a scout only when codebase facts are not already known.
+3. Spawn the interactive planner with the request and gathered evidence.
+4. Review the plan with the user.
+5. If approved, execute its scoped tasks sequentially with workers.
+6. Review the resulting changes.
 
-## The Flow
+Do not require every phase when its input or output already exists.
 
-```
-Phase 1: Quick Assessment (main session — 30s orientation)
-    ↓
-Phase 2: Scout (autonomous — codebase context)
-    ↓
-Phase 3: Spawn Planner Agent (interactive — clarifies WHAT, plans HOW, creates todos)
-    ↓
-    (Planner may spawn its own scouts/researchers mid-session as needed)
-    ↓
-Phase 4: Review Plan & Todos (main session)
-    ↓
-Phase 5: Execute Todos (workers — receive plan + scout context)
-    ↓
-Phase 6: Review
-```
+## Artifacts
 
----
+When a durable plan is useful, use `.pi/plans/YYYY-MM-DD-<name>/`:
 
-## Phase 1: Quick Assessment
+- `scout-context.md` — optional; the orchestrator saves the scout's returned report.
+- `plan.md` — written by the planner when a path is provided.
+- `review.md` — optional; the orchestrator saves the reviewer's returned report.
 
-Quick orientation — just enough to give the scout a focused mission:
+If writing is unavailable, pass and return the content inline. Never claim an artifact exists unless it was written.
 
-```bash
-ls -la
-find . -type f -name "*.ts" | head -20  # or relevant extension
-cat package.json 2>/dev/null | head -30
-```
+## Scout When Needed
 
-Spend ~30 seconds. Tech stack, project shape, and the area relevant to the user's request. This tells you what to ask the scout to focus on.
-
----
-
-## Artifact Paths
-
-For a planning run, pick a short `<name>` (e.g. `auth-redesign`) and use a shared directory under `.pi/plans/YYYY-MM-DD-<name>/` for every deliverable. Scout and reviewer return reports in their final messages; the orchestrator writes those reports to the paths below when needed. Only ask agents with a suitable write tool and role permissions, such as planner, to create their own artifacts.
-
-Standard filenames:
-
-- `.pi/plans/YYYY-MM-DD-<name>/scout-context.md`
-- `.pi/plans/YYYY-MM-DD-<name>/plan.md`
-- `.pi/plans/YYYY-MM-DD-<name>/review.md` (optional, for reviewer output)
-
----
-
-## Phase 2: Scout
-
-**Always spawn a scout before the planner.** The scout's context feeds into the planning session — it lets the planner skip re-asking questions whose answers live in the code, and gives it a solid base to design from.
+Skip the scout when the relevant code and constraints are already established. Otherwise ask one bounded discovery question:
 
 ```typescript
 subagent({
   name: "🔍 Scout",
   agent: "scout",
-  task: `Analyze the codebase for [user's request area]. Map file structure, key modules, patterns, conventions, and existing code related to [feature area]. Focus on what a planner would need to understand before designing this feature.
-
-Return your complete findings in your final message. Do not create a report file.`,
+  task: `For [requested change], identify the current entrypoint, flow, relevant files, existing patterns, and genuine unknowns. Return the complete report in your final message; do not create a report file.`,
 });
 ```
 
-**Wait for the scout's automatic result delivery.** As the orchestrator, save the returned report to `.pi/plans/YYYY-MM-DD-<name>/scout-context.md` using your own `write` tool, then pass the findings to the planner. If writing is unavailable, pass the report inline and do not claim a file exists.
+Wait for automatic result delivery. As the orchestrator, save the returned report only if useful, then pass it to the planner.
 
-The planner can spawn **additional** scouts or researchers mid-session if it hits a factual gap. That's expected — don't try to pre-scout every possible area.
-
----
-
-## Phase 3: Spawn Planner Agent
-
-Spawn the interactive planner with the scout's context and the user's request. The planner handles everything from here: clarifying intent, compact requirements engineering, ISC, approach exploration, design validation, premortem, plan artifact, and todos.
+## Planner
 
 ```typescript
 subagent({
   name: "💬 Planner",
   agent: "planner",
   interactive: true,
-  task: `Plan: [what the user wants to build]
+  task: `Plan: [user request]
 
-Scout context:
-[paste scout findings here — file structure, conventions, patterns, relevant code]
+Verified context:
+[paste scout findings and relevant user decisions]
 
-Save the final plan to: .pi/plans/YYYY-MM-DD-<name>/plan.md
-Create todos tagged with: <name>`,
+Save the final plan to: .pi/plans/YYYY-MM-DD-<name>/plan.md`,
 });
 ```
 
-**The user works with the planner.** It will clarify requirements lightly (1-2 rounds of questions, not a deep spec session), propose approaches, validate the design, run a premortem, write the plan, and create todos with mandatory code examples.
+The planner uses the short path by default. The user only needs to interact when a real decision is unresolved. When planning is complete, the user exits the planner session with Ctrl+D.
 
-When done, the user presses Ctrl+D and the plan + todos are returned to the main session.
+If planning materially expands into an uninspected subsystem, gather one additional bounded scout report before execution.
 
-### The planner may spawn its own specialists
+## Review the Plan
 
-During the session, the planner can spawn:
-- **`scout`** — when a design decision depends on existing code it hasn't read
-- **`researcher`** — when a decision depends on external facts (library tradeoffs, best practices, API behaviors)
+Read the plan and summarize its scope, ordered tasks, verification, and material risks. Ask the user for approval only when execution was not already requested or a material choice remains open.
 
-These are internal to the planning session. You'll see them in the multiplexer but don't need to intervene.
+## Execute
 
-### Optional: extra scout after planning
-
-If the planner significantly changed scope (new subsystems, areas the original scout didn't cover), spawn another scout targeting the new areas before workers start:
+Pass each ordered plan step directly to a worker with its acceptance criteria. Run workers sequentially in a shared working tree.
 
 ```typescript
-subagent({
-  name: "🔍 Scout (updated scope)",
-  agent: "scout",
-  task: "The plan changed scope. Gather context for [new areas]. Read the plan at [plan path]. Focus on [specific files/modules the planner identified that weren't in the original scout].",
-});
-```
-
-Fold the new context into the worker tasks.
-
----
-
-## Phase 4: Review Plan & Todos
-
-Once the planner closes, read the plan and list todos:
-
-```typescript
-todo({ action: "list" });
-```
-
-Review with the user:
-
-> "Here's what the planner produced: [brief summary]. Ready to execute, or anything to adjust?"
-
----
-
-## Phase 5: Execute Todos
-
-Spawn workers sequentially. Each worker gets the plan path and scout context:
-
-```typescript
-// Workers execute scoped tasks sequentially — one at a time
 subagent({
   name: "🔨 Worker 1/N",
   agent: "worker",
-  task: "Implement [task details and acceptance criteria]. Plan: [plan path]\n\nScout context: [paste scout summary from Phase 2, plus any re-scout from Phase 3]",
-});
-
-// Check the result, update orchestration state, then start the next task
-subagent({
-  name: "🔨 Worker 2/N",
-  agent: "worker",
-  task: "Implement [next task details and acceptance criteria]. Plan: [plan path]\n\nScout context: [paste scout summary]",
+  task: "Implement [task and acceptance criteria]. Plan: [plan path or inline plan]. Verified context: [relevant evidence]",
 });
 ```
 
-**Always run workers sequentially in the same git repo** — parallel workers can conflict in the shared working tree.
+After each result, verify it before starting the next dependent step. A worker commits only when explicitly requested.
 
----
-
-## Phase 6: Review
-
-After all todos are complete:
+## Review Changes
 
 ```typescript
 subagent({
   name: "Reviewer",
   agent: "reviewer",
   interactive: false,
-  task: "Review the recent changes. Plan: [plan path]. Return the complete review in your final message; do not create a report file.",
+  task: "Review the changes against [plan path or inline plan]. Return the complete review in your final message; do not create a report file.",
 });
 ```
 
-After the reviewer returns, the orchestrator may save its report to `.pi/plans/YYYY-MM-DD-<name>/review.md` using its own `write` tool. Otherwise keep it inline; do not ask the reviewer to write it.
+Fix evidence-backed critical/high findings. Re-review only when fixes are substantial.
 
-Triage findings:
+## Completion Check
 
-- **P0** — Real bugs, security issues → fix now
-- **P1** — Genuine traps, maintenance dangers → fix before merging
-- **P2** — Minor issues → fix if quick, note otherwise
-- **P3** — Nits → skip
-
-Create todos for P0/P1, run workers to fix, re-review only if fixes were substantial.
-
----
-
-## ⚠️ Completion Checklist
-
-Before reporting done:
-
-1. ✅ Scout ran before the planner?
-2. ✅ Scout context was passed to the planner?
-3. ✅ All worker tasks completed and verified?
-4. ✅ Any explicitly requested commits created?
-5. ✅ Reviewer has run?
-6. ✅ Reviewer findings triaged and addressed?
+- The plan matches the request and verified code.
+- Every executed step has validation evidence.
+- Material reviewer findings are resolved or explicitly accepted.
+- Commits exist only when requested.
