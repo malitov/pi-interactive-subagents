@@ -54,6 +54,8 @@ import {
   shouldMarkUserTookOver,
   shouldAutoExitOnAgentEnd,
   findLatestAssistantError,
+  parseMaxTurns,
+  shouldStopForMaxTurns,
 } from "../pi-extension/subagents/subagent-done.ts";
 import { __pollForExitTest__ } from "../pi-extension/subagents/cmux.ts";
 
@@ -885,6 +887,22 @@ describe("subagent discovery", () => {
     });
   });
 
+  it("loads max-turns and lets maxTurns override it", async () => {
+    await withIsolatedAgentEnv(async ({ projectAgentsDir }) => {
+      writeAgentFile(
+        projectAgentsDir,
+        "bounded-test-agent",
+        ["name: bounded-test-agent", "max-turns: 7"].join("\n"),
+      );
+
+      const loaded = testApi.loadAgentDefaults("bounded-test-agent");
+      assert.equal(loaded?.maxTurns, 7);
+      assert.equal(testApi.resolveEffectiveMaxTurns({ name: "A", task: "T" }, loaded), 7);
+      assert.equal(testApi.resolveEffectiveMaxTurns({ name: "A", task: "T", maxTurns: 3 }, loaded), 3);
+      assert.equal(testApi.resolveEffectiveMaxTurns({ name: "A", task: "T", maxTurns: 0 }, loaded), 0);
+    });
+  });
+
   it("loads explicit interactive flag from frontmatter", async () => {
     await withIsolatedAgentEnv(async ({ projectAgentsDir }) => {
       writeAgentFile(
@@ -1371,6 +1389,25 @@ describe("subagent-done.ts", () => {
       assert.equal(findLatestAssistantError([]), null);
     });
   });
+
+  describe("max turns", () => {
+    it("parses only non-negative safe integers", () => {
+      assert.equal(parseMaxTurns("5"), 5);
+      assert.equal(parseMaxTurns(0), 0);
+      assert.equal(parseMaxTurns(undefined), undefined);
+      assert.equal(parseMaxTurns("-1"), undefined);
+      assert.equal(parseMaxTurns("1.5"), undefined);
+      assert.equal(parseMaxTurns("nope"), undefined);
+    });
+
+    it("stops only when the budget is exhausted and another cycle is pending", () => {
+      assert.equal(shouldStopForMaxTurns(0, 10, true), false);
+      assert.equal(shouldStopForMaxTurns(3, 2, true), false);
+      assert.equal(shouldStopForMaxTurns(3, 3, false), false);
+      assert.equal(shouldStopForMaxTurns(3, 3, true), true);
+      assert.equal(shouldStopForMaxTurns(3, 4, true), true);
+    });
+  });
 });
 
 describe("cmux.ts interpretExitSidecar", () => {
@@ -1414,6 +1451,17 @@ describe("cmux.ts interpretExitSidecar", () => {
     assert.equal(result.reason, "error");
     assert.equal(result.exitCode, 1);
     assert.match(result.errorMessage ?? "", /no errorMessage/);
+  });
+
+  it("decodes a max-turns stop as a non-successful partial result", () => {
+    assert.deepEqual(
+      interpretExitSidecar({ type: "limit_reached", maxTurns: 3, completedTurns: 3 }),
+      {
+        reason: "limit_reached",
+        exitCode: 1,
+        limitReached: { maxTurns: 3, completedTurns: 3 },
+      },
+    );
   });
 
   it("treats unknown payload shapes as done", () => {
@@ -1492,6 +1540,16 @@ describe("tool registration", () => {
     const autoExitSchema = resumeTool.parameters.properties.autoExit;
     assert.equal(autoExitSchema.type, "boolean");
     assert.match(autoExitSchema.description, /Defaults to true/);
+  });
+
+  it("exposes a non-negative maxTurns launch override", () => {
+    const { api, registeredTools } = createMockExtensionApi();
+    (subagentsModule as any).default(api);
+
+    const subagentTool = registeredTools.find((tool) => tool.name === "subagent");
+    assert.ok(subagentTool);
+    assert.equal(subagentTool.parameters.properties.maxTurns.type, "integer");
+    assert.equal(subagentTool.parameters.properties.maxTurns.minimum, 0);
   });
 
   it("rejects an unknown explicit agent instead of using generic defaults", async () => {
@@ -1958,6 +2016,25 @@ describe("subagent interruption", () => {
 
     assert.match(presentation, /failed \(exit code 130\)/);
     assert.doesNotMatch(presentation, /interrupted/);
+    assert.match(presentation, /Resume: pi --session/);
+  });
+
+  it("marks a turn-limit stop as a partial result rather than success", () => {
+    const testApi = (subagentsModule as any).__test__;
+    const presentation = testApi.resolveResultPresentation(
+      {
+        exitCode: 1,
+        elapsed: 20,
+        summary: "Last available progress",
+        sessionFile: "/tmp/subagent.jsonl",
+        limitReached: { maxTurns: 3, completedTurns: 3 },
+      },
+      "Specialist",
+    );
+
+    assert.match(presentation, /reaching its 3-turn limit/);
+    assert.match(presentation, /partial result, not a successful completion/);
+    assert.match(presentation, /Last available progress/);
     assert.match(presentation, /Resume: pi --session/);
   });
 

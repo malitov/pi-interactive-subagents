@@ -53,6 +53,7 @@ import {
   type ActivityReadResult,
   type SubagentActivityState,
 } from "./activity.ts";
+import { parseMaxTurns } from "./subagent-done.ts";
 
 /** Absolute path to `pi-extension/subagents`. https://github.com/nodejs/node/issues/37845 */
 const SUBAGENTS_DIR = dirname(fileURLToPath(import.meta.url));
@@ -121,6 +122,13 @@ const SubagentParams = Type.Object({
         "Automatically finish the Pi subagent session and return its result after its final response, without requiring subagent_done. Set true for autonomous tasks, especially when no agent profile is supplied. Overrides the agent's auto-exit setting; defaults to that setting or false. Leave false for user-driven planning or iteration.",
     }),
   ),
+  maxTurns: Type.Optional(
+    Type.Integer({
+      minimum: 0,
+      description:
+        "Maximum assistant response cycles for this launch. Multiple tool calls in one response count as one cycle. Overrides the agent profile's max-turns; 0 or omitted means unlimited.",
+    }),
+  ),
   interactive: Type.Optional(
     Type.Boolean({
       description:
@@ -145,6 +153,7 @@ interface AgentDefaults {
   denyTools?: string;
   spawning?: boolean;
   autoExit?: boolean;
+  maxTurns?: number;
   interactive?: boolean;
   systemPromptMode?: "append" | "replace";
   sessionMode?: SubagentSessionMode;
@@ -250,6 +259,7 @@ function parseAgentDefinition(content: string, fallbackName: string): AgentDefin
     denyTools: getFrontmatterValue(frontmatter, "deny-tools"),
     spawning: parseOptionalBoolean(getFrontmatterValue(frontmatter, "spawning")),
     autoExit: parseOptionalBoolean(getFrontmatterValue(frontmatter, "auto-exit")),
+    maxTurns: parseMaxTurns(getFrontmatterValue(frontmatter, "max-turns")),
     interactive: parseOptionalBoolean(getFrontmatterValue(frontmatter, "interactive")),
     sessionMode: parseSessionMode(getFrontmatterValue(frontmatter, "session-mode")),
     cwd: getFrontmatterValue(frontmatter, "cwd"),
@@ -342,6 +352,13 @@ function resolveEffectiveAutoExit(
   agentDefs: AgentDefaults | null,
 ): boolean {
   return params.autoExit ?? agentDefs?.autoExit ?? false;
+}
+
+function resolveEffectiveMaxTurns(
+  params: Static<typeof SubagentParams>,
+  agentDefs: AgentDefaults | null,
+): number {
+  return parseMaxTurns(params.maxTurns) ?? agentDefs?.maxTurns ?? 0;
 }
 
 /**
@@ -452,13 +469,20 @@ function formatWidgetRightLabel(snapshot: StatusSnapshot): string {
 function resolveResultPresentation(
   result: Pick<
     SubagentResult,
-    "exitCode" | "elapsed" | "summary" | "sessionFile" | "errorMessage"
+    "exitCode" | "elapsed" | "summary" | "sessionFile" | "errorMessage" | "limitReached"
   >,
   name: string,
 ): string {
   const sessionRef = result.sessionFile
     ? `\n\nSession: ${result.sessionFile}\nResume: pi --session ${result.sessionFile}`
     : "";
+
+  if (result.limitReached) {
+    return (
+      `Sub-agent "${name}" stopped after reaching its ${result.limitReached.maxTurns}-turn limit. ` +
+      `This is a partial result, not a successful completion.\n\n${result.summary}${sessionRef}`
+    );
+  }
 
   if (result.errorMessage) {
     // Auto-retry exhausted or other agent-loop error. The subagent did not
@@ -493,6 +517,8 @@ interface SubagentResult {
   error?: string;
   /** Provider/agent error message when auto-retry exhausted (overload, rate limit, etc.). */
   errorMessage?: string;
+  /** Present when another model cycle was blocked by maxTurns. */
+  limitReached?: { maxTurns: number; completedTurns: number };
   ping?: { name: string; message: string };
 }
 
@@ -914,6 +940,7 @@ export const __test__ = {
   resolveEffectiveSessionMode,
   resolveLaunchBehavior,
   resolveEffectiveAutoExit,
+  resolveEffectiveMaxTurns,
   resolveEffectiveInteractive,
   buildSubagentToolAllowlist,
   buildPiPromptArgs,
@@ -958,7 +985,12 @@ async function launchSubagent(
   const effectiveSkills = params.skills ?? agentDefs?.skills;
   const effectiveThinking = agentDefs?.thinking;
   const effectiveAutoExit = resolveEffectiveAutoExit(params, agentDefs);
+  const effectiveMaxTurns = resolveEffectiveMaxTurns(params, agentDefs);
   const effectiveInteractive = resolveEffectiveInteractive(params, agentDefs);
+
+  if (effectiveMaxTurns > 0 && agentDefs?.cli === "claude") {
+    throw new Error("maxTurns is supported only for Pi-backed subagents");
+  }
 
   const sessionFile = ctx.sessionManager.getSessionFile();
   if (!sessionFile) throw new Error("No session file");
@@ -1013,14 +1045,17 @@ async function launchSubagent(
   const summaryInstruction = effectiveAutoExit
     ? "Your FINAL assistant message is returned to the orchestrator automatically. Include the actual findings or changes, verification results, and any blockers or unverified assumptions. Do not only say 'done' or refer to an earlier answer. Do not wait for the user to ask you to return the result."
     : "When the task is complete, send an assistant message with the actual findings or changes, verification results, and any blockers or unverified assumptions. Then call subagent_done to return control to the orchestrator; a final message alone does not return the result. Do not wait for a reminder. While user input is still needed, continue the conversation instead of calling subagent_done.";
+  const turnLimitInstruction = effectiveMaxTurns > 0
+    ? `You have at most ${effectiveMaxTurns} assistant response cycles. Multiple tool calls in one response count as one cycle. Finish with the best available result before requesting another cycle.`
+    : "";
   const denySet = resolveDenyTools(agentDefs);
   const identity = agentDefs?.body ?? params.systemPrompt ?? null;
   const systemPromptMode = agentDefs?.systemPromptMode;
   const identityInSystemPrompt = systemPromptMode && identity;
   const roleBlock = identity && !identityInSystemPrompt ? `\n\n${identity}` : "";
   const fullTask = inheritsConversationContext
-    ? params.task
-    : `${roleBlock}\n\n${modeHint}\n\n${params.task}\n\n${summaryInstruction}`;
+    ? `${params.task}${turnLimitInstruction ? `\n\n${turnLimitInstruction}` : ""}`
+    : `${roleBlock}\n\n${modeHint}\n\n${params.task}\n\n${summaryInstruction}${turnLimitInstruction ? `\n\n${turnLimitInstruction}` : ""}`;
   // ── Claude Code CLI path ──
   if (agentDefs?.cli === "claude") {
     const sentinelFile = `/tmp/pi-claude-${id}-done`;
@@ -1151,6 +1186,7 @@ async function launchSubagent(
   }
   // Explicitly clear an inherited value when an autonomous parent launches an interactive child.
   envParts.push(`PI_SUBAGENT_AUTO_EXIT=${effectiveAutoExit ? "1" : "0"}`);
+  envParts.push(`PI_SUBAGENT_MAX_TURNS=${effectiveMaxTurns}`);
   envParts.push(`PI_SUBAGENT_SESSION=${shellEscape(subagentSessionFile)}`);
   envParts.push(`PI_SUBAGENT_ID=${shellEscape(id)}`);
   envParts.push(`PI_SUBAGENT_ACTIVITY_FILE=${shellEscape(activityFile)}`);
@@ -1341,6 +1377,7 @@ async function watchSubagent(
       exitCode: result.exitCode,
       elapsed,
       ping: result.ping,
+      limitReached: result.limitReached,
       ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
     };
   } catch (err: any) {
@@ -1522,6 +1559,13 @@ export default function subagentsExtension(pi: ExtensionAPI) {
                   elapsed: result.elapsed,
                   sessionFile: result.sessionFile,
                   ...(result.errorMessage ? { errorMessage: result.errorMessage } : {}),
+                  ...(result.limitReached
+                    ? {
+                        status: "limit_reached",
+                        maxTurns: result.limitReached.maxTurns,
+                        completedTurns: result.limitReached.completedTurns,
+                      }
+                    : {}),
                   ...(result.claudeSessionId ? { claudeSessionId: result.claudeSessionId } : {}),
                 },
               },
@@ -2039,6 +2083,7 @@ export default function subagentsExtension(pi: ExtensionAPI) {
         const name = details.name ?? "subagent";
         const exitCode = details.exitCode ?? 0;
         const errorMessage = typeof details.errorMessage === "string" ? details.errorMessage : "";
+        const limitReached = details.status === "limit_reached";
         const failed = exitCode !== 0 || !!errorMessage;
         const elapsed = details.elapsed != null ? formatElapsed(details.elapsed) : "?";
         const bgFn = failed
@@ -2047,7 +2092,9 @@ export default function subagentsExtension(pi: ExtensionAPI) {
         const icon = failed
           ? theme.fg("error", "✗")
           : theme.fg("success", "✓");
-        const status = errorMessage
+        const status = limitReached
+          ? `limit reached (${details.completedTurns}/${details.maxTurns} turns)`
+          : errorMessage
           ? "failed (provider/agent error)"
           : failed
             ? `failed (exit ${exitCode})`
@@ -2062,6 +2109,10 @@ export default function subagentsExtension(pi: ExtensionAPI) {
           .replace(/\n\nSession: .+\nResume: .+$/, "")
           .replace(`Sub-agent "${name}" completed (${elapsed}).\n\n`, "")
           .replace(`Sub-agent "${name}" failed (exit code ${exitCode}).\n\n`, "")
+          .replace(
+            `Sub-agent "${name}" stopped after reaching its ${details.maxTurns}-turn limit. This is a partial result, not a successful completion.\n\n`,
+            "",
+          )
           .replace(
             new RegExp(
               `^Sub-agent "${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}" failed after ${elapsed} \\(provider/agent error — auto-retry exhausted\\)\\.\\n\\n`,

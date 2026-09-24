@@ -6,7 +6,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Box, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { createSubagentActivityRecorder } from "./activity.ts";
 
 export function shouldMarkUserTookOver(agentStarted: boolean): boolean {
@@ -75,6 +75,20 @@ export function parseDeniedTools(rawValue: string | undefined): string[] {
     .filter(Boolean);
 }
 
+export function parseMaxTurns(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+export function shouldStopForMaxTurns(
+  maxTurns: number,
+  completedTurns: number,
+  continuationPending: boolean,
+): boolean {
+  return maxTurns > 0 && completedTurns >= maxTurns && continuationPending;
+}
+
 export default function (pi: ExtensionAPI) {
   let toolNames: string[] = [];
   let denied: string[] = [];
@@ -85,6 +99,7 @@ export default function (pi: ExtensionAPI) {
   const subagentAgent = process.env.PI_SUBAGENT_AGENT ?? "";
   const deniedToolsValue = process.env.PI_DENY_TOOLS;
   const autoExit = process.env.PI_SUBAGENT_AUTO_EXIT === "1";
+  const maxTurns = parseMaxTurns(process.env.PI_SUBAGENT_MAX_TURNS) ?? 0;
   const recorder = createSubagentActivityRecorder({
     runningChildId: process.env.PI_SUBAGENT_ID,
     activityFile: process.env.PI_SUBAGENT_ACTIVITY_FILE,
@@ -143,6 +158,8 @@ export default function (pi: ExtensionAPI) {
 
   let userTookOver = false;
   let agentStarted = false;
+  let completedTurns = 0;
+  let maxTurnsReached = false;
 
   // Show widget + status bar on session start
   pi.on("session_start", (_event, ctx) => {
@@ -216,8 +233,32 @@ export default function (pi: ExtensionAPI) {
     recorder.turnStart((event as any).turnIndex);
   });
 
-  pi.on("turn_end", (event) => {
+  pi.on("turn_end", (event, ctx) => {
     recorder.turnEnd((event as any).turnIndex);
+    completedTurns++;
+    const sessionFile = process.env.PI_SUBAGENT_SESSION;
+    const exitFile = sessionFile ? `${sessionFile}.exit` : undefined;
+
+    if (maxTurnsReached || (exitFile && existsSync(exitFile))) return;
+    if (!shouldStopForMaxTurns(maxTurns, completedTurns, (event as any).context?.canContinue === true)) {
+      return;
+    }
+
+    maxTurnsReached = true;
+    if (exitFile) {
+      try {
+        writeFileSync(
+          exitFile,
+          JSON.stringify({ type: "limit_reached", maxTurns, completedTurns }),
+        );
+      } catch {
+        // Best effort. Shutdown still prevents another model cycle; the
+        // parent can fall back to the shell sentinel if the sidecar fails.
+      }
+    }
+    recorder.agentEndDone();
+    ctx.shutdown();
+    return { continue: false };
   });
 
   pi.on("before_provider_request", () => {

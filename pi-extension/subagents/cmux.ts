@@ -1333,13 +1333,15 @@ export function closeSurface(surface: string): void {
 
 export interface PollResult {
   /** How the subagent exited */
-  reason: "done" | "ping" | "sentinel" | "error";
-  /** Shell exit code (from sentinel). 0 for file-based exits. */
+  reason: "done" | "ping" | "sentinel" | "error" | "limit_reached";
+  /** Shell-style exit code. Controlled limits are non-zero so they cannot appear successful. */
   exitCode: number;
   /** Ping data if reason is "ping" */
   ping?: { name: string; message: string };
   /** Error message if reason is "error" (auto-retry exhausted, provider overload, etc.) */
   errorMessage?: string;
+  /** Structured turn-limit information when the child was stopped before another model cycle. */
+  limitReached?: { maxTurns: number; completedTurns: number };
 }
 
 /**
@@ -1361,6 +1363,19 @@ function interpretExitSidecar(data: any): PollResult {
         ? data.errorMessage
         : "Subagent exited with stopReason=error (no errorMessage in sidecar).";
     return { reason: "error", exitCode: 1, errorMessage };
+  }
+  if (
+    data?.type === "limit_reached" &&
+    Number.isSafeInteger(data.maxTurns) &&
+    data.maxTurns > 0 &&
+    Number.isSafeInteger(data.completedTurns) &&
+    data.completedTurns >= data.maxTurns
+  ) {
+    return {
+      reason: "limit_reached",
+      exitCode: 1,
+      limitReached: { maxTurns: data.maxTurns, completedTurns: data.completedTurns },
+    };
   }
   return { reason: "done", exitCode: 0 };
 }

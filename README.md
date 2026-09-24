@@ -308,6 +308,7 @@ You are a specialized agent that does X...
 | `spawning`    | boolean | Set `false` to deny all subagent-spawning tools                                                                                                                                                                                                                             |
 | `deny-tools`  | string  | Comma-separated extension tool names to deny                                                                                                                                                                                                                                |
 | `auto-exit`   | boolean | Auto-shutdown when the agent finishes its turn — no `subagent_done` call needed. If the user sends any input, auto-exit is permanently disabled and the user takes over the session. Recommended for autonomous agents (scout, worker); not for interactive ones (planner). Also determines the default value of `interactive` (see below). |
+| `max-turns`   | integer | Maximum assistant response cycles for the profile. Multiple tool calls in one response count once. `0` or omitted means unlimited; `maxTurns` on a launch overrides it. |
 | `interactive` | boolean | derived        | Override whether stall/recovery transitions wake the parent session. Defaults to the inverse of `auto-exit`: autonomous agents (`auto-exit: true`) are non-interactive and get stall pings; agents without `auto-exit` are interactive and stay quiet. Explicit values take precedence. |
 | `cwd`         | string  | Default working directory (absolute or relative to project root)                                                                                                                                                                                                            |
 | `disable-model-invocation` | boolean | Hide this agent from discovery surfaces like `subagents_list`. The agent still remains directly invokable by explicit name via `subagent({ agent: "name", ... })`. |
@@ -364,6 +365,23 @@ name: scout
 auto-exit: true
 ---
 ```
+
+### `max-turns`
+
+Use a profile default to bound autonomous work, and override it for one launch when needed:
+
+```yaml
+---
+name: focused-researcher
+max-turns: 8
+---
+```
+
+```typescript
+subagent({ name: "Quick check", agent: "focused-researcher", maxTurns: 3, task: "Verify one claim" });
+```
+
+The limit is enforced before another model cycle starts. Natural completion at or below the limit remains successful; forced stops return the last available output as a partial result with status `limit_reached`. This does not limit how long one tool call may run.
 
 ### `interactive`
 
