@@ -87,6 +87,7 @@ Subagent panes are created without stealing keyboard focus (herdr, cmux, tmux). 
 | **scout**         | GPT-6 Luna             | Fast codebase reconnaissance — maps files, patterns, conventions                         |
 | **worker**        | GPT-5.6 Luna (max thinking) | Implements scoped changes and runs targeted verification                                |
 | **reviewer**      | GPT-6 Sol (medium thinking) | Reviews code for bugs, security issues, correctness                              |
+| **ephemeral-specialist** | GPT-5.6 Sol (medium thinking) | Answers one narrowly delegated technical question, read-only                    |
 | **visual-tester** | GPT-6 Sol              | Visual QA via Chrome CDP — screenshots, responsive testing, interaction testing          |
 | **deep-explorer** | GPT-6 Sol              | Autonomous hands-on investigation and experimentation in Pi                              |
 
@@ -424,7 +425,7 @@ deny-tools: subagent
 | ---------- | ----------- | -------------------------------------------- |
 | planner    | _(default)_ | Legitimately spawns scouts for investigation |
 | worker     | `false`     | Should implement tasks, not delegate         |
-| researcher | `false`     | Should research, not spawn                   |
+| ephemeral-specialist | `false` | Should answer one question, not delegate |
 | reviewer   | `false`     | Should review, not spawn                     |
 | scout      | `false`     | Should gather context, not spawn             |
 

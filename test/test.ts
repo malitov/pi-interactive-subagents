@@ -1006,7 +1006,7 @@ describe("subagent discovery", () => {
   });
 
   it("bundled scout/worker/reviewer agents resolve as non-interactive; planner resolves as interactive", () => {
-    for (const name of ["scout", "worker", "reviewer"]) {
+    for (const name of ["scout", "worker", "reviewer", "ephemeral-specialist"]) {
       const defs = testApi.loadAgentDefaults(name);
       assert.ok(defs, `expected bundled agent ${name} to be discoverable`);
       assert.equal(
@@ -1026,13 +1026,28 @@ describe("subagent discovery", () => {
   });
 
   it("bundled agents use OpenAI Codex models and the Pi CLI", () => {
-    for (const name of ["planner", "scout", "worker", "reviewer", "visual-tester", "deep-explorer"]) {
+    for (const name of ["planner", "scout", "worker", "reviewer", "ephemeral-specialist", "visual-tester", "deep-explorer"]) {
       const defs = testApi.loadAgentDefaults(name);
       assert.ok(defs, `expected bundled agent ${name} to be discoverable`);
-      assert.equal(defs.model, name === "worker" ? "openai-codex/gpt-5.6-luna" : `openai-codex/gpt-6-${name === "scout" ? "luna" : "sol"}`);
+      assert.equal(
+        defs.model,
+        name === "worker"
+          ? "openai-codex/gpt-5.6-luna"
+          : name === "ephemeral-specialist"
+            ? "openai-codex/gpt-5.6-sol"
+            : `openai-codex/gpt-6-${name === "scout" ? "luna" : "sol"}`,
+      );
       if (name === "worker") assert.equal(defs.thinking, "max");
       assert.notEqual(defs.cli, "claude");
     }
+  });
+
+  it("bundles a read-only autonomous ephemeral specialist", () => {
+    const defs = testApi.loadAgentDefaults("ephemeral-specialist");
+    assert.ok(defs);
+    assert.equal(defs.tools, "read, grep, find, ls");
+    assert.equal(defs.spawning, false);
+    assert.equal(defs.autoExit, true);
   });
 
   it("scout and reviewer return reports without requiring a write tool", () => {
@@ -1468,6 +1483,25 @@ describe("tool registration", () => {
     const autoExitSchema = resumeTool.parameters.properties.autoExit;
     assert.equal(autoExitSchema.type, "boolean");
     assert.match(autoExitSchema.description, /Defaults to true/);
+  });
+
+  it("rejects an unknown explicit agent instead of using generic defaults", async () => {
+    const { api, registeredTools } = createMockExtensionApi();
+    (subagentsModule as any).default(api);
+
+    const subagentTool = registeredTools.find((tool) => tool.name === "subagent");
+    assert.ok(subagentTool);
+    const result = await subagentTool.execute(
+      "test-call",
+      { name: "Typo", task: "Do work", agent: "missing-agent-profile" },
+      undefined,
+      undefined,
+      {},
+    );
+
+    assert.equal(result.details.error, "agent not found");
+    assert.match(result.content[0].text, /missing-agent-profile/);
+    assert.match(result.content[0].text, /omit agent for a profileless launch/);
   });
 });
 

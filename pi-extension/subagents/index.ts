@@ -1429,6 +1429,16 @@ export default function subagentsExtension(pi: ExtensionAPI) {
       parameters: SubagentParams,
 
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+        if (params.agent && !loadAgentDefaults(params.agent)) {
+          return {
+            content: [{
+              type: "text",
+              text: `Error: agent profile "${params.agent}" was not found. Use subagents_list to see available profiles, or omit agent for a profileless launch.`,
+            }],
+            details: { error: "agent not found", agent: params.agent },
+          };
+        }
+
         // Prevent self-spawning (e.g. planner spawning another planner)
         const currentAgent = process.env.PI_SUBAGENT_AGENT;
         if (params.agent && currentAgent && params.agent === currentAgent) {
