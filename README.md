@@ -85,7 +85,7 @@ Subagent panes are created without stealing keyboard focus (herdr, cmux, tmux). 
 | ----------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
 | **planner**       | GPT-6 Sol (medium thinking) | Brainstorming — clarifies requirements, explores approaches, writes plans, creates todos |
 | **scout**         | GPT-6 Luna             | Fast codebase reconnaissance — maps files, patterns, conventions                         |
-| **worker**        | GPT-6 Sol              | Implements tasks from todos — writes code, runs tests, makes polished commits            |
+| **worker**        | GPT-5.6 Luna (max thinking) | Implements tasks from todos — writes code, runs tests, makes polished commits            |
 | **reviewer**      | GPT-6 Sol (medium thinking) | Reviews code for bugs, security issues, correctness                              |
 | **visual-tester** | GPT-6 Sol              | Visual QA via Chrome CDP — screenshots, responsive testing, interaction testing          |
 | **deep-explorer** | GPT-6 Sol              | Autonomous hands-on investigation and experimentation in Pi                              |

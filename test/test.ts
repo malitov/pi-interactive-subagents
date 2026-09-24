@@ -1029,7 +1029,8 @@ describe("subagent discovery", () => {
     for (const name of ["planner", "scout", "worker", "reviewer", "visual-tester", "deep-explorer"]) {
       const defs = testApi.loadAgentDefaults(name);
       assert.ok(defs, `expected bundled agent ${name} to be discoverable`);
-      assert.equal(defs.model, `openai-codex/gpt-6-${name === "scout" ? "luna" : "sol"}`);
+      assert.equal(defs.model, name === "worker" ? "openai-codex/gpt-5.6-luna" : `openai-codex/gpt-6-${name === "scout" ? "luna" : "sol"}`);
+      if (name === "worker") assert.equal(defs.thinking, "max");
       assert.notEqual(defs.cli, "claude");
     }
   });
