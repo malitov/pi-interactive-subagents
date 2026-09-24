@@ -1050,6 +1050,15 @@ describe("subagent discovery", () => {
     assert.equal(defs.autoExit, true);
   });
 
+  it("visual tester uses agent-browser without the removed chrome-cdp dependency", () => {
+    const content = readFileSync(new URL("../agents/visual-tester.md", import.meta.url), "utf8");
+    assert.match(content, /agent-browser skills get core --full/);
+    assert.match(content, /agent-browser --session/);
+    assert.match(content, /snapshot -i/);
+    assert.match(content, /Always close the isolated session/);
+    assert.doesNotMatch(content, /chrome-cdp|scripts\/cdp\.mjs/);
+  });
+
   it("scout and reviewer return reports without requiring a write tool", () => {
     for (const name of ["scout", "reviewer"]) {
       const content = readFileSync(new URL(`../agents/${name}.md`, import.meta.url), "utf8");
