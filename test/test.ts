@@ -1077,6 +1077,16 @@ describe("subagent discovery", () => {
     assert.doesNotMatch(content, /chrome-cdp|scripts\/cdp\.mjs/);
   });
 
+  it("deep explorer limits experiments to explicitly writable locations", () => {
+    const content = readFileSync(new URL("../agents/deep-explorer.md", import.meta.url), "utf8");
+    assert.match(content, /Default to read-only diagnosis/);
+    assert.match(content, /Write only under `\/tmp`/);
+    assert.match(content, /worktree the task explicitly identifies as writable/);
+    assert.match(content, /Do not install dependencies or tools/);
+    assert.match(content, /expected observation and stopping condition/);
+    assert.match(content, /established root cause from a likely explanation/);
+  });
+
   it("scout and reviewer return reports without requiring a write tool", () => {
     for (const name of ["scout", "reviewer"]) {
       const content = readFileSync(new URL(`../agents/${name}.md`, import.meta.url), "utf8");
