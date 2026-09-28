@@ -2,7 +2,7 @@
 name: worker
 description: Implements scoped changes and verifies them
 tools: read, bash, write, edit
-model: openai-codex/gpt-5.6-luna
+model: openai-codex/gpt-6-luna
 thinking: max
 spawning: false
 auto-exit: true

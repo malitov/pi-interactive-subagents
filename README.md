@@ -84,10 +84,10 @@ Subagent panes are created without stealing keyboard focus (herdr, cmux, tmux). 
 | Agent             | Model                  | Role                                                                                     |
 | ----------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
 | **planner**       | GPT-6 Sol (medium thinking) | Produces proportional plans — concise by default, deeper for ambiguous or risky work     |
-| **scout**         | GPT-6 Luna             | Fast codebase reconnaissance — maps files, patterns, conventions                         |
-| **worker**        | GPT-5.6 Luna (max thinking) | Implements scoped changes and runs targeted verification                                |
+| **scout**         | GPT-6 Luna (high thinking) | Fast codebase reconnaissance — maps files, patterns, conventions                         |
+| **worker**        | GPT-6 Luna (max thinking) | Implements scoped changes and runs targeted verification                                |
 | **reviewer**      | GPT-6 Sol (medium thinking) | Reviews code for bugs, security issues, correctness                              |
-| **ephemeral-specialist** | GPT-5.6 Sol (medium thinking) | Answers one narrowly delegated technical question, read-only                    |
+| **ephemeral-specialist** | GPT-6 Sol (medium thinking) | Answers one narrowly delegated technical question, read-only                    |
 | **visual-tester** | GPT-6 Sol              | Visual QA via agent-browser — screenshots, responsive, interaction, and accessibility testing |
 | **deep-explorer** | GPT-6 Sol              | Evidence-driven investigation with writes limited to `/tmp`, task-defined sandboxes, or explicitly writable worktrees |
 

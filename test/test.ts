@@ -1049,13 +1049,11 @@ describe("subagent discovery", () => {
       assert.ok(defs, `expected bundled agent ${name} to be discoverable`);
       assert.equal(
         defs.model,
-        name === "worker"
-          ? "openai-codex/gpt-5.6-luna"
-          : name === "ephemeral-specialist"
-            ? "openai-codex/gpt-5.6-sol"
-            : `openai-codex/gpt-6-${name === "scout" ? "luna" : "sol"}`,
+        `openai-codex/gpt-6-${name === "scout" || name === "worker" ? "luna" : "sol"}`,
       );
       if (name === "worker") assert.equal(defs.thinking, "max");
+      if (name === "scout") assert.equal(defs.thinking, "high");
+      if (name === "ephemeral-specialist") assert.equal(defs.thinking, "medium");
       assert.notEqual(defs.cli, "claude");
     }
   });

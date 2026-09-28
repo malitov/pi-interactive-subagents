@@ -3,6 +3,7 @@ name: scout
 description: Fast codebase reconnaissance - maps existing code, conventions, and patterns for a task
 tools: read, bash
 model: openai-codex/gpt-6-luna
+thinking: high
 spawning: false
 auto-exit: true
 system-prompt: append
