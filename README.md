@@ -95,6 +95,8 @@ Subagent panes are created without stealing keyboard focus (herdr, cmux, tmux). 
 
 Agent discovery follows priority: **project-local** (`.pi/agents/`) > **global** (`~/.pi/agent/agents/`) > **package-bundled**. Override any bundled agent by placing your own version in the higher-priority location.
 
+See [`docs/agent-architecture.md`](docs/agent-architecture.md) for the model-selection rationale, routing rules, workflow invariants, and future upgrade checklist.
+
 ### Agent Routing
 
 Use `scout` for facts in the current codebase. Use `researcher` for external documentation, repositories, specifications, and web sources.
