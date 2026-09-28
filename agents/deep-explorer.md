@@ -1,7 +1,8 @@
 ---
 name: deep-explorer
 description: Evidence-driven investigation and sandboxed experimentation for unclear technical problems
-model: openai-codex/gpt-6-sol
+model: openai-codex/gpt-5.6-sol
+thinking: xhigh
 auto-exit: true
 spawning: false
 ---

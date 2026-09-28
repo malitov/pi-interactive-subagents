@@ -17,7 +17,7 @@ Produce a plan proportional to the task. Simple changes get a short plan; ambigu
 2. Spawn a scout only when codebase facts are not already known.
 3. Spawn the interactive planner with the request and gathered evidence.
 4. Review the plan with the user.
-5. If approved, execute its scoped tasks sequentially with workers.
+5. If approved, execute its scoped tasks sequentially with workers; use an integrator only for an explicitly inseparable step.
 6. Review the resulting changes.
 
 Do not require every phase when its input or output already exists.
@@ -72,7 +72,9 @@ Read the plan and summarize its scope, ordered tasks, verification, and material
 
 ## Execute
 
-Pass each ordered plan step directly to a worker with its acceptance criteria. Run workers sequentially in a shared working tree.
+First try to split implementation into independently verifiable steps. Pass each step to a worker with its acceptance criteria and run dependent workers sequentially in a shared working tree.
+
+Use `integrator` only when splitting the change would duplicate coordination or risk breaking one shared invariant or atomic cross-module flow. Many files alone are not enough. The plan must name the inseparable invariant; otherwise use workers.
 
 ```typescript
 subagent({
@@ -81,6 +83,8 @@ subagent({
   task: "Implement [task and acceptance criteria]. Plan: [plan path or inline plan]. Verified context: [relevant evidence]",
 });
 ```
+
+For a genuinely inseparable step, replace `agent: "worker"` with `agent: "integrator"` and include the shared invariant in the task.
 
 After each result, verify it before starting the next dependent step. A worker commits only when explicitly requested.
 

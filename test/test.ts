@@ -1023,8 +1023,8 @@ describe("subagent discovery", () => {
     );
   });
 
-  it("bundled scout/worker/reviewer agents resolve as non-interactive; planner resolves as interactive", () => {
-    for (const name of ["scout", "worker", "reviewer", "ephemeral-specialist"]) {
+  it("bundled autonomous agents resolve as non-interactive; planner resolves as interactive", () => {
+    for (const name of ["scout", "researcher", "worker", "integrator", "reviewer", "ephemeral-specialist"]) {
       const defs = testApi.loadAgentDefaults(name);
       assert.ok(defs, `expected bundled agent ${name} to be discoverable`);
       assert.equal(
@@ -1044,15 +1044,25 @@ describe("subagent discovery", () => {
   });
 
   it("bundled agents use OpenAI Codex models and the Pi CLI", () => {
-    for (const name of ["planner", "scout", "worker", "reviewer", "ephemeral-specialist", "visual-tester", "deep-explorer"]) {
+    const expectedModels: Record<string, string> = {
+      planner: "gpt-5.6-sol",
+      scout: "gpt-6-luna",
+      researcher: "gpt-5.6-sol",
+      worker: "gpt-6-luna",
+      integrator: "gpt-5.6-luna",
+      reviewer: "gpt-5.6-sol",
+      "ephemeral-specialist": "gpt-6-sol",
+      "visual-tester": "gpt-6-sol",
+      "deep-explorer": "gpt-5.6-sol",
+    };
+    for (const name of ["planner", "scout", "researcher", "worker", "integrator", "reviewer", "ephemeral-specialist", "visual-tester", "deep-explorer"]) {
       const defs = testApi.loadAgentDefaults(name);
       assert.ok(defs, `expected bundled agent ${name} to be discoverable`);
-      assert.equal(
-        defs.model,
-        `openai-codex/gpt-6-${name === "scout" || name === "worker" ? "luna" : "sol"}`,
-      );
-      if (name === "worker") assert.equal(defs.thinking, "max");
-      if (name === "scout") assert.equal(defs.thinking, "high");
+      assert.equal(defs.model, `openai-codex/${expectedModels[name]}`);
+      if (name === "worker" || name === "integrator") assert.equal(defs.thinking, "max");
+      if (name === "scout" || name === "researcher") assert.equal(defs.thinking, "high");
+      if (name === "planner") assert.equal(defs.thinking, "high");
+      if (name === "reviewer" || name === "deep-explorer") assert.equal(defs.thinking, "xhigh");
       if (name === "ephemeral-specialist") assert.equal(defs.thinking, "medium");
       assert.notEqual(defs.cli, "claude");
     }
@@ -1064,6 +1074,16 @@ describe("subagent discovery", () => {
     assert.equal(defs.tools, "read, grep, find, ls");
     assert.equal(defs.spawning, false);
     assert.equal(defs.autoExit, true);
+  });
+
+  it("bundles a read-only autonomous external researcher", () => {
+    const defs = testApi.loadAgentDefaults("researcher");
+    assert.ok(defs);
+    assert.equal(defs.tools, "read, bash");
+    assert.equal(defs.spawning, false);
+    assert.equal(defs.autoExit, true);
+    assert.match(defs.body ?? "", /primary sources/i);
+    assert.match(defs.body ?? "", /Temporary clones and downloads under `\/tmp` are allowed/);
   });
 
   it("visual tester uses agent-browser without the removed chrome-cdp dependency", () => {
@@ -1104,12 +1124,39 @@ describe("subagent discovery", () => {
     assert.doesNotMatch(worker, /todo\(|\/skill:commit|claim the todo|close the todo/i);
   });
 
+  it("reviewer covers the full review range and validates proportionally", () => {
+    const reviewer = readFileSync(new URL("../agents/reviewer.md", import.meta.url), "utf8");
+    assert.match(reviewer, /try to disprove that the implementation is correct/);
+    assert.match(reviewer, /staged, unstaged, and untracked files/);
+    assert.match(reviewer, /Never guess a range such as `HEAD~N`/);
+    assert.match(reviewer, /Run the narrowest relevant checks first/);
+    assert.match(reviewer, /pre-existing or environmental failures/);
+    assert.doesNotMatch(reviewer, /## What's Good/);
+  });
+
+  it("routes implementation to workers before the integrator", () => {
+    const integrator = readFileSync(new URL("../agents/integrator.md", import.meta.url), "utf8");
+    const planner = readFileSync(new URL("../agents/planner.md", import.meta.url), "utf8");
+    const plan = readFileSync(new URL("../pi-extension/subagents/plan-skill.md", import.meta.url), "utf8");
+    const { api, registeredTools } = createMockExtensionApi();
+    (subagentsModule as any).default(api);
+    const subagentTool = registeredTools.find((tool) => tool.name === "subagent");
+    assert.ok(subagentTool);
+    assert.match(integrator, /If the task can be divided into independently verifiable steps/);
+    assert.match(integrator, /^spawning: false$/m);
+    assert.match(integrator, /^auto-exit: true$/m);
+    assert.match(planner, /small enough for `worker` by default/);
+    assert.match(plan, /Many files alone are not enough/);
+    assert.match(subagentTool.description, /split work into independently verifiable worker tasks first/);
+    assert.match(subagentTool.description, /Use scout for facts in the current codebase and researcher for external/);
+  });
+
   it("planner defaults to proportional planning without unsupported dependencies", () => {
     const planner = readFileSync(new URL("../agents/planner.md", import.meta.url), "utf8");
     assert.match(planner, /Short path — default/);
     assert.match(planner, /Deep path — only when justified/);
     assert.match(planner, /Do not force confirmation/);
-    assert.doesNotMatch(planner, /researcher|write-todos|\/answer|todo\(/i);
+    assert.doesNotMatch(planner, /write-todos|\/answer|todo\(/i);
   });
 
   it("ignores invalid session-mode values", async () => {

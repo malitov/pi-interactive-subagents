@@ -83,15 +83,28 @@ Subagent panes are created without stealing keyboard focus (herdr, cmux, tmux). 
 
 | Agent             | Model                  | Role                                                                                     |
 | ----------------- | ---------------------- | ---------------------------------------------------------------------------------------- |
-| **planner**       | GPT-6 Sol (medium thinking) | Produces proportional plans — concise by default, deeper for ambiguous or risky work     |
+| **planner**       | GPT-5.6 Sol (high thinking) | Produces proportional plans — concise by default, deeper for ambiguous or risky work     |
 | **scout**         | GPT-6 Luna (high thinking) | Fast codebase reconnaissance — maps files, patterns, conventions                         |
+| **researcher**    | GPT-5.6 Sol (high thinking) | Researches external primary sources and returns evidence-backed findings                 |
 | **worker**        | GPT-6 Luna (max thinking) | Implements scoped changes and runs targeted verification                                |
-| **reviewer**      | GPT-6 Sol (medium thinking) | Reviews code for bugs, security issues, correctness                              |
+| **integrator**    | GPT-5.6 Luna (max thinking) | Implements an inseparable cross-module change with one shared invariant                 |
+| **reviewer**      | GPT-5.6 Sol (xhigh thinking) | Reviews code for bugs, security issues, correctness                              |
 | **ephemeral-specialist** | GPT-6 Sol (medium thinking) | Answers one narrowly delegated technical question, read-only                    |
 | **visual-tester** | GPT-6 Sol              | Visual QA via agent-browser — screenshots, responsive, interaction, and accessibility testing |
-| **deep-explorer** | GPT-6 Sol              | Evidence-driven investigation with writes limited to `/tmp`, task-defined sandboxes, or explicitly writable worktrees |
+| **deep-explorer** | GPT-5.6 Sol (xhigh thinking) | Evidence-driven investigation with writes limited to `/tmp`, task-defined sandboxes, or explicitly writable worktrees |
 
 Agent discovery follows priority: **project-local** (`.pi/agents/`) > **global** (`~/.pi/agent/agents/`) > **package-bundled**. Override any bundled agent by placing your own version in the higher-priority location.
+
+### Agent Routing
+
+Use `scout` for facts in the current codebase. Use `researcher` for external documentation, repositories, specifications, and web sources.
+
+Decompose implementation into independently verifiable `worker` tasks first. Use `integrator` only when splitting would risk a shared invariant or atomic cross-module flow; touching many files alone is not sufficient.
+
+```text
+Can each step be implemented and verified independently? yes → worker(s)
+Would splitting break one shared invariant or atomic flow? yes → integrator
+```
 
 ---
 
@@ -249,7 +262,7 @@ The `/plan` command orchestrates a full planning-to-implementation pipeline.
 Phase 1: Context          → Inspect or run a bounded scout when needed
 Phase 2: Planning         → Interactive planner; short path by default
 Phase 3: Review Plan      → Confirm material choices when needed
-Phase 4: Execute          → Sequential workers implement scoped steps
+Phase 4: Execute          → Workers by default; integrator only for an inseparable step
 Phase 5: Review           → Reviewer checks all changes
 ```
 
@@ -356,7 +369,7 @@ When set to `true`, the agent session shuts down automatically as soon as the ag
 
 **When to use:**
 
-- ✅ Autonomous agents (scout, worker, reviewer) that run to completion
+- ✅ Autonomous agents (scout, researcher, worker, integrator, reviewer) that run to completion
 - ❌ Interactive agents (planner, iterate) where the user drives the session
 
 ```yaml
@@ -443,6 +456,8 @@ deny-tools: subagent
 | ---------- | ----------- | -------------------------------------------- |
 | planner    | _(default)_ | Legitimately spawns scouts for investigation |
 | worker     | `false`     | Should implement tasks, not delegate         |
+| integrator | `false`     | Should implement one cross-module task, not delegate |
+| researcher | `false`     | Should gather external evidence, not delegate |
 | ephemeral-specialist | `false` | Should answer one question, not delegate |
 | reviewer   | `false`     | Should review, not spawn                     |
 | scout      | `false`     | Should gather context, not spawn             |
