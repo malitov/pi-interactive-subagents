@@ -1051,8 +1051,8 @@ describe("subagent discovery", () => {
       worker: "gpt-6-luna",
       integrator: "gpt-5.6-luna",
       reviewer: "gpt-5.6-sol",
-      "ephemeral-specialist": "gpt-6-sol",
-      "visual-tester": "gpt-6-sol",
+      "ephemeral-specialist": "gpt-6.1-sol",
+      "visual-tester": "gpt-6.1-sol",
       "deep-explorer": "gpt-5.6-sol",
     };
     for (const name of ["planner", "scout", "researcher", "worker", "integrator", "reviewer", "ephemeral-specialist", "visual-tester", "deep-explorer"]) {
@@ -1064,6 +1064,7 @@ describe("subagent discovery", () => {
       if (name === "planner") assert.equal(defs.thinking, "high");
       if (name === "reviewer" || name === "deep-explorer") assert.equal(defs.thinking, "xhigh");
       if (name === "ephemeral-specialist") assert.equal(defs.thinking, "medium");
+      if (name === "visual-tester") assert.equal(defs.thinking, "high");
       assert.notEqual(defs.cli, "claude");
     }
   });

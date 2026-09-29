@@ -1,7 +1,7 @@
 ---
 name: ephemeral-specialist
 description: Read-only specialist for one narrowly delegated technical question
-model: openai-codex/gpt-6-sol
+model: openai-codex/gpt-6.1-sol
 thinking: medium
 tools: read, grep, find, ls
 spawning: false

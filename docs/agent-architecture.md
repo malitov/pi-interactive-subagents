@@ -17,8 +17,9 @@ When these disagree, fix them together. Do not update only the README or this do
 Spend expensive reasoning where an error propagates across the workflow, and use cheaper models where the task is bounded and independently verifiable.
 
 ```text
-GPT-5.6: decide, synthesize, integrate, and challenge
-GPT-6: inspect, execute bounded work, and perform structured checks
+GPT-5.6: established quality baseline for planning, review, research, and integration
+GPT-6.1 Sol: main interaction and bounded Sol specialist roles
+GPT-6 Luna: inexpensive reconnaissance and independently verifiable execution
 ```
 
 This is role-based routing, not a claim that one model family is universally better.
@@ -37,8 +38,9 @@ Relevant discussions reviewed at the time:
 - [Luna 5.6 vs Luna 6 real-codebase A/B report](https://www.reddit.com/r/codex/comments/1wp7ckc/)
 - [Sol/Luna 6 efficiency discussion](https://www.reddit.com/r/codex/comments/1wnhmfd/)
 - [Sol 6 vs Sol 5.6 user comparison](https://www.reddit.com/r/codex/comments/1worwfr/)
+- [OpenAI GPT-6.1 Sol announcement](https://openai.com/index/introducing-gpt-6-1-sol/)
 
-These are directional signals, not scientific benchmarks. Samples were small, prompts and environments differed, and benchmark contamination was possible. Future changes must be validated against this repository's actual tasks rather than preserving these assignments indefinitely.
+These are directional signals, not scientific benchmarks. Samples were small, prompts and environments differed, and benchmark contamination was possible. OpenAI reports that GPT-6.1 Sol materially improves coding, computer use, factuality, and agent reliability over GPT-6 Sol, but does not publish a direct GPT-5.6 Sol comparison. Future changes must be validated against this repository's actual tasks rather than preserving these assignments indefinitely.
 
 ## Current Role Structure
 
@@ -58,10 +60,12 @@ These are directional signals, not scientific benchmarks. Samples were small, pr
 | `scout` | GPT-6 Luna · High | Current-repository reconnaissance is read-only, bounded, and cheap to verify. |
 | `worker` | GPT-6 Luna · Max | Implements a planned, independently verifiable change at low quota cost. |
 | `integrator` | GPT-5.6 Luna · Max | Owns one inseparable cross-module invariant where weak integration reasoning is costly. |
-| `ephemeral-specialist` | GPT-6 Sol · Medium | Answers one narrow technical question without creating a permanent role. |
-| `visual-tester` | GPT-6 Sol | Follows a structured browser-based QA procedure and returns visual evidence. |
+| `ephemeral-specialist` | GPT-6.1 Sol · Medium | Answers one narrow technical question without creating a permanent role. |
+| `visual-tester` | GPT-6.1 Sol · High | Uses GPT-6.1's stronger computer-use performance for browser-based QA. |
 
-The recommended model for the main interactive session is **GPT-5.6 Sol · High**. The main session interprets incomplete requests, retains conversation context, chooses agents, and judges their outputs. Use XHigh temporarily for critical architecture or debugging, not as the permanent default.
+The configured model for the main interactive session is **GPT-6.1 Sol · Low**. The main session interprets requests, retains conversation context, chooses agents, and judges their outputs; GPT-6.1 replaces GPT-6 Sol here because of its stronger coding, factuality, and agent-reliability results. Low is the Pi-supported equivalent of the requested light mode. Raise it temporarily for critical architecture or debugging rather than paying for deeper reasoning on every conversational turn.
+
+GPT-5.6 Sol remains the quality baseline for `planner`, `researcher`, `reviewer`, and `deep-explorer` until controlled local A/B tasks show that GPT-6.1 Sol matches or improves their role-specific outcomes.
 
 ## Routing Rules
 

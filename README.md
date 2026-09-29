@@ -89,8 +89,8 @@ Subagent panes are created without stealing keyboard focus (herdr, cmux, tmux). 
 | **worker**        | GPT-6 Luna (max thinking) | Implements scoped changes and runs targeted verification                                |
 | **integrator**    | GPT-5.6 Luna (max thinking) | Implements an inseparable cross-module change with one shared invariant                 |
 | **reviewer**      | GPT-5.6 Sol (xhigh thinking) | Reviews code for bugs, security issues, correctness                              |
-| **ephemeral-specialist** | GPT-6 Sol (medium thinking) | Answers one narrowly delegated technical question, read-only                    |
-| **visual-tester** | GPT-6 Sol              | Visual QA via agent-browser — screenshots, responsive, interaction, and accessibility testing |
+| **ephemeral-specialist** | GPT-6.1 Sol (medium thinking) | Answers one narrowly delegated technical question, read-only                    |
+| **visual-tester** | GPT-6.1 Sol (high thinking) | Visual QA via agent-browser — screenshots, responsive, interaction, and accessibility testing |
 | **deep-explorer** | GPT-5.6 Sol (xhigh thinking) | Evidence-driven investigation with writes limited to `/tmp`, task-defined sandboxes, or explicitly writable worktrees |
 
 Agent discovery follows priority: **project-local** (`.pi/agents/`) > **global** (`~/.pi/agent/agents/`) > **package-bundled**. Override any bundled agent by placing your own version in the higher-priority location.

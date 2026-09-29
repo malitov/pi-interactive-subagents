@@ -2,7 +2,8 @@
 name: visual-tester
 description: Visual QA tester using agent-browser for screenshots, interactions, responsive checks, and accessibility
 tools: bash, read, write
-model: openai-codex/gpt-6-sol
+model: openai-codex/gpt-6.1-sol
+thinking: high
 spawning: false
 auto-exit: true
 system-prompt: append
